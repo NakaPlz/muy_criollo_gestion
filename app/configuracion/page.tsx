@@ -11,7 +11,8 @@ import {
     AlertCircle,
     Loader2,
     Download,
-    Plus
+    Plus,
+    ChevronDown
 } from "lucide-react";
 
 interface MLItem {
@@ -55,6 +56,7 @@ export default function ConfiguracionPage() {
     const [data, setData] = useState<StockData | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [mlConnected, setMlConnected] = useState(false);
+    const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         loadData();
@@ -128,6 +130,33 @@ export default function ConfiguracionPage() {
 
     function isItemLinked(mlItemId: string): boolean {
         return data?.linked_items.some(item => item.external_id === mlItemId) || false;
+    }
+
+    function toggleProduct(productName: string) {
+        setExpandedProducts(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(productName)) {
+                newSet.delete(productName);
+            } else {
+                newSet.add(productName);
+            }
+            return newSet;
+        });
+    }
+
+    // Agrupar items vinculados por producto
+    function getGroupedLinkedItems() {
+        if (!data?.linked_items) return {};
+
+        const grouped: Record<string, LinkedItem[]> = {};
+        for (const item of data.linked_items) {
+            const productName = item.product_variant?.product?.name || 'Sin producto';
+            if (!grouped[productName]) {
+                grouped[productName] = [];
+            }
+            grouped[productName].push(item);
+        }
+        return grouped;
     }
 
     function formatDate(dateStr: string): string {
@@ -265,38 +294,76 @@ export default function ConfiguracionPage() {
                                 <p className="text-sm mt-2">Vinculá tus variantes con items de ML para sincronizar stock</p>
                             </div>
                         ) : (
-                            <div className="space-y-3">
-                                {data.linked_items.map((item) => {
-                                    const stockMatch = item.stock_synced === item.product_variant?.stock_quantity;
+                            <div className="space-y-2">
+                                {Object.entries(getGroupedLinkedItems()).map(([productName, variants]) => {
+                                    const isExpanded = expandedProducts.has(productName);
+                                    const totalStock = variants.reduce((sum, v) => sum + (v.product_variant?.stock_quantity || 0), 0);
+                                    const allSynced = variants.every(v => v.stock_synced === v.product_variant?.stock_quantity);
+
                                     return (
-                                        <div
-                                            key={item.id}
-                                            className="flex items-center justify-between p-3 bg-gray-50 dark:bg-[#252525] rounded-md"
-                                        >
-                                            <div>
-                                                <p className="font-medium">{item.product_variant?.product?.name}</p>
-                                                <p className="text-sm text-muted-foreground">
-                                                    {item.product_variant?.name}
-                                                    {item.product_variant?.sku && ` (${item.product_variant.sku})`}
-                                                </p>
-                                            </div>
-                                            <div className="flex items-center gap-4">
-                                                <div className="text-right">
-                                                    <p className="text-sm">
-                                                        Stock: <span className="font-bold">{item.product_variant?.stock_quantity}</span>
-                                                    </p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        Sincronizado: {item.stock_synced}
-                                                    </p>
+                                        <div key={productName} className="border border-[var(--border)] rounded-lg overflow-hidden">
+                                            {/* Header del producto - clickeable */}
+                                            <button
+                                                onClick={() => toggleProduct(productName)}
+                                                className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-[#252525] hover:bg-gray-100 dark:hover:bg-[#2a2a2a] transition-colors"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <ChevronDown
+                                                        className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                                                    />
+                                                    <div className="text-left">
+                                                        <p className="font-medium">{productName}</p>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {variants.length} variante{variants.length > 1 ? 's' : ''}
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                                <div className={`p-1 rounded ${stockMatch ? 'bg-green-500/10' : 'bg-yellow-500/10'}`}>
-                                                    {stockMatch ? (
-                                                        <Check className="h-4 w-4 text-green-500" />
-                                                    ) : (
-                                                        <AlertCircle className="h-4 w-4 text-yellow-500" />
-                                                    )}
+                                                <div className="flex items-center gap-3">
+                                                    <div className="text-right">
+                                                        <p className="text-sm">Stock total: <span className="font-bold">{totalStock}</span></p>
+                                                    </div>
+                                                    <div className={`p-1 rounded ${allSynced ? 'bg-green-500/10' : 'bg-yellow-500/10'}`}>
+                                                        {allSynced ? (
+                                                            <Check className="h-4 w-4 text-green-500" />
+                                                        ) : (
+                                                            <AlertCircle className="h-4 w-4 text-yellow-500" />
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            </button>
+
+                                            {/* Variantes expandidas */}
+                                            {isExpanded && (
+                                                <div className="border-t border-[var(--border)]">
+                                                    {variants.map((item) => {
+                                                        const stockMatch = item.stock_synced === item.product_variant?.stock_quantity;
+                                                        return (
+                                                            <div
+                                                                key={item.id}
+                                                                className="flex items-center justify-between p-3 pl-10 border-b border-[var(--border)] last:border-b-0"
+                                                            >
+                                                                <div>
+                                                                    <p className="text-sm">{item.product_variant?.name}</p>
+                                                                    <p className="text-xs text-muted-foreground">
+                                                                        {item.product_variant?.sku && `SKU: ${item.product_variant.sku}`}
+                                                                    </p>
+                                                                </div>
+                                                                <div className="flex items-center gap-4">
+                                                                    <div className="text-right">
+                                                                        <p className="text-sm">
+                                                                            <span className="font-bold">{item.product_variant?.stock_quantity}</span>
+                                                                        </p>
+                                                                        <p className="text-xs text-muted-foreground">
+                                                                            ML: {item.stock_synced}
+                                                                        </p>
+                                                                    </div>
+                                                                    <div className={`w-2 h-2 rounded-full ${stockMatch ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })}
