@@ -336,13 +336,14 @@ export type SettingUpdate = Partial<SettingInsert>
 // ============================================
 // TIPOS UTILITARIOS
 // ============================================
-export interface ProductWithRelations extends Product {
+export type ProductWithRelations = Omit<Product, 'category' | 'variants' | 'images'> & {
     category: Category | null
     variants: ProductVariant[]
     images: ProductImage[]
 }
 
-export interface SaleWithRelations extends Sale {
+export type SaleWithRelations = Omit<Sale, 'customer' | 'items'> & {
     customer: Customer | null
     items: SaleItem[]
 }
+
