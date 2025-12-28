@@ -144,7 +144,7 @@ export default function Home() {
                   />
                   <Tooltip
                     contentStyle={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)' }}
-                    formatter={(value: number) => [formatCurrency(value), 'Total']}
+                    formatter={(value) => [formatCurrency(Number(value) || 0), 'Total']}
                   />
                   <Line
                     type="monotone"
