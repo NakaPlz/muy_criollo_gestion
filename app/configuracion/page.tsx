@@ -251,7 +251,7 @@ export default function ConfiguracionPage() {
                             <div className="flex items-center gap-3">
                                 <Link2 className="h-5 w-5 text-green-500" />
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Vinculados</p>
+                                    <p className="text-sm text-muted-foreground">Variantes Vinculadas</p>
                                     <p className="text-xl font-bold">{data.linked_items.length}</p>
                                 </div>
                             </div>
@@ -260,8 +260,10 @@ export default function ConfiguracionPage() {
                             <div className="flex items-center gap-3">
                                 <AlertCircle className="h-5 w-5 text-yellow-500" />
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Sin Vincular</p>
-                                    <p className="text-xl font-bold">{data.ml_items.length - data.linked_items.length}</p>
+                                    <p className="text-sm text-muted-foreground">Items Sin Vincular</p>
+                                    <p className="text-xl font-bold">
+                                        {data.ml_items.filter(item => !isItemLinked(item.id)).length}
+                                    </p>
                                 </div>
                             </div>
                         </div>
