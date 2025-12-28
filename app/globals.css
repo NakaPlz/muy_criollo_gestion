@@ -1,0 +1,169 @@
+@import "tailwindcss";
+
+/* ================================
+   CUSTOM THEME VARIABLES
+   ================================ */
+@theme {
+  /* Colors */
+  --color-primary: #D9A51F;
+  --color-primary-foreground: #000000;
+  --color-background: #F3F4F6;
+  --color-foreground: #111827;
+  --color-card: #FFFFFF;
+  --color-card-foreground: #111827;
+  --color-muted-foreground: #6B7280;
+
+  --color-sidebar-bg: #000000;
+  --color-sidebar-fg: #E5E7EB;
+  --color-sidebar-active: #D9A51F;
+  --color-sidebar-active-fg: #000000;
+
+  --color-border: #E5E7EB;
+  --color-input: #E5E7EB;
+  --color-ring: #D9A51F;
+
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
+
+  /* Radius */
+  --radius-md: 8px;
+}
+
+/* ================================
+   CSS VARIABLES FOR COMPONENTS
+   ================================ */
+:root {
+  --primary: #D9A51F;
+  --primary-foreground: #000000;
+  --background: #F3F4F6;
+  --foreground: #111827;
+  --card: #FFFFFF;
+  --card-foreground: #111827;
+  --sidebar-background: #000000;
+  --sidebar-foreground: #E5E7EB;
+  --sidebar-active: #D9A51F;
+  --sidebar-active-foreground: #000000;
+  --border: #E5E7EB;
+  --input: #E5E7EB;
+  --ring: #D9A51F;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+  --radius: 8px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #111111;
+    --foreground: #EDEDED;
+    --card: #1C1C1C;
+    --card-foreground: #EDEDED;
+    --sidebar-background: #000000;
+    --sidebar-foreground: #9CA3AF;
+    --border: #333333;
+    --input: #333333;
+  }
+}
+
+/* ================================
+   BASE STYLES
+   ================================ */
+@layer base {
+  html {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+
+  body {
+    @apply min-h-screen antialiased;
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+}
+
+/* ================================
+   COMPONENT STYLES
+   ================================ */
+@layer components {
+
+  /* Card component */
+  .card {
+    background-color: var(--card);
+    color: var(--card-foreground);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 1.5rem;
+  }
+
+  /* Button styles */
+  .btn {
+    @apply inline-flex items-center justify-center font-medium cursor-pointer transition-opacity;
+    border-radius: var(--radius);
+    padding: 0.5rem 1rem;
+  }
+
+  .btn:hover {
+    opacity: 0.9;
+  }
+
+  .btn-primary {
+    background-color: var(--primary);
+    color: var(--primary-foreground);
+  }
+
+  .btn-outline {
+    border: 1px solid var(--input);
+    background: transparent;
+  }
+
+  /* Input styles */
+  .input {
+    @apply flex h-10 w-full text-sm;
+    border-radius: var(--radius);
+    border: 1px solid var(--input);
+    background-color: transparent;
+    padding: 0.5rem 0.75rem;
+    color: var(--foreground);
+  }
+
+  .input:focus {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* Select styles for dark mode */
+  select.input {
+    background-color: var(--card);
+    color: var(--foreground);
+  }
+
+  select.input option {
+    background-color: var(--card);
+    color: var(--foreground);
+    padding: 0.5rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    select.input {
+      background-color: #1C1C1C;
+      color: #EDEDED;
+    }
+
+    select.input option {
+      background-color: #1C1C1C;
+      color: #EDEDED;
+    }
+  }
+
+  /* Muted text */
+  .text-muted-foreground {
+    color: #6B7280;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .text-muted-foreground {
+      color: #9CA3AF;
+    }
+  }
+}
