@@ -9,7 +9,9 @@ import {
     ExternalLink,
     Package,
     AlertCircle,
-    Loader2
+    Loader2,
+    Download,
+    Plus
 } from "lucide-react";
 
 interface MLItem {
@@ -49,6 +51,7 @@ interface StockData {
 export default function ConfiguracionPage() {
     const [loading, setLoading] = useState(true);
     const [syncing, setSyncing] = useState(false);
+    const [importing, setImporting] = useState<string | null>(null);
     const [data, setData] = useState<StockData | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [mlConnected, setMlConnected] = useState(false);
@@ -98,6 +101,33 @@ export default function ConfiguracionPage() {
         } finally {
             setSyncing(false);
         }
+    }
+
+    async function importItem(mlItemId: string) {
+        try {
+            setImporting(mlItemId);
+            const res = await fetch('/api/mercadolibre/import', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ml_item_id: mlItemId }),
+            });
+            const json = await res.json();
+
+            if (json.success) {
+                alert(`✅ ${json.message}`);
+                loadData();
+            } else {
+                alert(`❌ Error: ${json.error}`);
+            }
+        } catch (err) {
+            alert('Error importando producto');
+        } finally {
+            setImporting(null);
+        }
+    }
+
+    function isItemLinked(mlItemId: string): boolean {
+        return data?.linked_items.some(item => item.external_id === mlItemId) || false;
     }
 
     function formatDate(dateStr: string): string {
@@ -285,41 +315,64 @@ export default function ConfiguracionPage() {
                             </div>
                         ) : (
                             <div className="grid gap-3 md:grid-cols-2">
-                                {data.ml_items.map((item) => (
-                                    <div
-                                        key={item.id}
-                                        className="flex items-start gap-3 p-3 border border-[var(--border)] rounded-md"
-                                    >
-                                        {item.thumbnail && (
-                                            <img
-                                                src={item.thumbnail}
-                                                alt={item.title}
-                                                className="w-16 h-16 object-cover rounded"
-                                            />
-                                        )}
-                                        <div className="flex-1 min-w-0">
-                                            <p className="font-medium text-sm truncate">{item.title}</p>
-                                            <p className="text-xs text-muted-foreground">
-                                                Stock: <span className="font-bold">{item.available_quantity}</span>
-                                                {' · '}
-                                                Vendidos: {item.sold_quantity}
-                                            </p>
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <span className="text-xs font-mono bg-gray-100 dark:bg-[#333] px-1.5 py-0.5 rounded">
-                                                    {item.id}
-                                                </span>
-                                                <a
-                                                    href={item.permalink}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-xs text-[var(--primary)] hover:underline flex items-center gap-1"
-                                                >
-                                                    Ver <ExternalLink className="h-3 w-3" />
-                                                </a>
+                                {data.ml_items.map((item) => {
+                                    const linked = isItemLinked(item.id);
+                                    return (
+                                        <div
+                                            key={item.id}
+                                            className={`flex items-start gap-3 p-3 border rounded-md ${linked ? 'border-green-500/50 bg-green-500/5' : 'border-[var(--border)]'}`}
+                                        >
+                                            {item.thumbnail && (
+                                                <img
+                                                    src={item.thumbnail}
+                                                    alt={item.title}
+                                                    className="w-16 h-16 object-cover rounded"
+                                                />
+                                            )}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <p className="font-medium text-sm truncate flex-1">{item.title}</p>
+                                                    {linked ? (
+                                                        <span className="text-xs bg-green-500/10 text-green-500 px-2 py-1 rounded flex items-center gap-1">
+                                                            <Check className="h-3 w-3" /> Vinculado
+                                                        </span>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => importItem(item.id)}
+                                                            disabled={importing === item.id}
+                                                            className="text-xs bg-[var(--primary)] text-black px-2 py-1 rounded flex items-center gap-1 hover:opacity-80 disabled:opacity-50"
+                                                        >
+                                                            {importing === item.id ? (
+                                                                <Loader2 className="h-3 w-3 animate-spin" />
+                                                            ) : (
+                                                                <Plus className="h-3 w-3" />
+                                                            )}
+                                                            Importar
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Stock: <span className="font-bold">{item.available_quantity}</span>
+                                                    {' · '}
+                                                    Vendidos: {item.sold_quantity}
+                                                </p>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className="text-xs font-mono bg-gray-100 dark:bg-[#333] px-1.5 py-0.5 rounded">
+                                                        {item.id}
+                                                    </span>
+                                                    <a
+                                                        href={item.permalink}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-xs text-[var(--primary)] hover:underline flex items-center gap-1"
+                                                    >
+                                                        Ver <ExternalLink className="h-3 w-3" />
+                                                    </a>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
