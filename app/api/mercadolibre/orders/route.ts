@@ -17,9 +17,19 @@ async function getValidTokens(supabase: Awaited<ReturnType<typeof createClient>>
         .eq('key', 'ml_tokens')
         .single()
 
-    if (error || !data) return null
+    if (error || !data) {
+        console.log('No ML tokens found in settings:', error?.message)
+        return null
+    }
 
-    const tokens: MLTokens = JSON.parse(data.value)
+    // Handle both string and already-parsed JSON
+    let tokens: MLTokens
+    try {
+        tokens = typeof data.value === 'string' ? JSON.parse(data.value) : data.value as MLTokens
+    } catch (e) {
+        console.error('Error parsing ML tokens:', e)
+        return null
+    }
 
     // Si el token está por expirar (menos de 5 minutos), refrescarlo
     if (tokens.expires_at < Date.now() + 300000) {
@@ -81,7 +91,10 @@ export async function GET(request: NextRequest) {
     } catch (err) {
         console.error('Error fetching ML orders:', err)
         return NextResponse.json(
-            { error: 'Error obteniendo órdenes de Mercado Libre' },
+            {
+                error: 'Error obteniendo órdenes de Mercado Libre',
+                details: err instanceof Error ? err.message : 'Unknown error'
+            },
             { status: 500 }
         )
     }
