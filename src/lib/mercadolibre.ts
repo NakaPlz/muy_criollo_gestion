@@ -202,6 +202,44 @@ export async function getItem(accessToken: string, itemId: string): Promise<MLIt
 }
 
 /**
+ * Obtiene múltiples items en una sola llamada (máximo 20 por llamada)
+ * Esto reduce significativamente el número de requests a la API
+ */
+export async function getItemsMulti(accessToken: string, itemIds: string[]): Promise<MLItem[]> {
+    if (itemIds.length === 0) return []
+
+    // ML permite máximo 20 IDs por llamada
+    const chunks: string[][] = []
+    for (let i = 0; i < itemIds.length; i += 20) {
+        chunks.push(itemIds.slice(i, i + 20))
+    }
+
+    const allItems: MLItem[] = []
+
+    for (const chunk of chunks) {
+        const ids = chunk.join(',')
+        const response = await mlFetch<{ code: number; body: MLItem }[]>(
+            `/items?ids=${ids}`,
+            accessToken
+        )
+
+        // El endpoint multiget devuelve un array con { code, body }
+        for (const item of response) {
+            if (item.code === 200 && item.body) {
+                allItems.push(item.body)
+            }
+        }
+
+        // Pequeño delay entre chunks para evitar rate limiting
+        if (chunks.length > 1) {
+            await new Promise(resolve => setTimeout(resolve, 100))
+        }
+    }
+
+    return allItems
+}
+
+/**
  * Actualiza el stock de un item
  */
 export async function updateItemStock(accessToken: string, itemId: string, availableQuantity: number): Promise<MLItem> {

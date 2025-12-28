@@ -1,6 +1,6 @@
 // API Route para sincronizar stock con Mercado Libre
 import { NextRequest, NextResponse } from 'next/server'
-import { getItems, getItem, updateItemStock, refreshAccessToken } from '@/src/lib/mercadolibre'
+import { getItems, getItem, getItemsMulti, updateItemStock, refreshAccessToken, MLItem } from '@/src/lib/mercadolibre'
 import { createClient } from '@/lib/supabase/server'
 
 interface MLTokens {
@@ -78,37 +78,27 @@ export async function GET() {
             limit: 50,
         })
 
-        // Obtener detalles de cada item
-        const items = await Promise.all(
-            itemsResponse.results.map(async (itemId) => {
-                try {
-                    const item = await getItem(tokens.access_token, itemId)
-                    return {
-                        id: item.id,
-                        title: item.title,
-                        price: item.price,
-                        available_quantity: item.available_quantity,
-                        sold_quantity: item.sold_quantity,
-                        status: item.status,
-                        permalink: item.permalink,
-                        thumbnail: item.thumbnail,
-                        seller_sku: item.seller_sku,
-                        variations: item.variations?.map(v => ({
-                            id: v.id,
-                            available_quantity: v.available_quantity,
-                            seller_custom_field: v.seller_custom_field,
-                            attributes: v.attribute_combinations,
-                        })),
-                    }
-                } catch (err) {
-                    console.error(`Error fetching item ${itemId}:`, err)
-                    return null
-                }
-            })
-        )
+        // Obtener detalles de todos los items en pocas llamadas (20 por llamada)
+        const mlItems = await getItemsMulti(tokens.access_token, itemsResponse.results)
 
-        // Filtrar nulls
-        const validItems = items.filter(item => item !== null)
+        // Mapear a la estructura que necesitamos
+        const items = mlItems.map(item => ({
+            id: item.id,
+            title: item.title,
+            price: item.price,
+            available_quantity: item.available_quantity,
+            sold_quantity: item.sold_quantity,
+            status: item.status,
+            permalink: item.permalink,
+            thumbnail: item.thumbnail,
+            seller_sku: item.seller_sku,
+            variations: item.variations?.map(v => ({
+                id: v.id,
+                available_quantity: v.available_quantity,
+                seller_custom_field: v.seller_custom_field,
+                attributes: v.attribute_combinations,
+            })),
+        }))
 
         // Obtener vinculaciones existentes de la BD
         const { data: listings } = await supabase
@@ -126,7 +116,7 @@ export async function GET() {
             .eq('platform', 'mercadolibre')
 
         return NextResponse.json({
-            ml_items: validItems,
+            ml_items: items,
             linked_items: listings || [],
             total_ml_items: itemsResponse.paging.total,
         })
