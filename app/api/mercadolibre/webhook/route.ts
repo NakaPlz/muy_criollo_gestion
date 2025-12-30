@@ -142,9 +142,10 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Error creating sale' }, { status: 500 })
         }
 
-        // Crear los items de la venta
+        // Crear los items de la venta y descontar stock
         for (const item of mlOrder.order_items) {
-            await supabase
+            // 1. Crear item en sale_items de postgres
+            const { data: saleItem, error: saleItemError } = await supabase
                 .from('sale_items')
                 .insert({
                     sale_id: sale.id,
@@ -153,6 +154,49 @@ export async function POST(request: NextRequest) {
                     unit_price: item.unit_price,
                     total_price: item.quantity * item.unit_price,
                 })
+                .select()
+                .single()
+
+            if (saleItemError) {
+                console.error('Error creating sale item:', saleItemError)
+                continue
+            }
+
+            // 2. Intentar descontar stock
+            // Buscamos el producto vinculado usando el item_id y variation_id de ML
+            let query = supabase
+                .from('platform_listings')
+                .select('product_variant_id, product_variant:product_variants(stock_quantity)')
+                .eq('platform', 'mercadolibre')
+                .eq('external_id', item.item.id)
+
+            if (item.item.variation_id) {
+                // Si tiene variación, intentamos buscar por variation_id específico
+                // Primero intentamos match exacto por external_variant_id
+                const { data: specificVariant } = await supabase
+                    .from('platform_listings')
+                    .select('product_variant_id, product_variant:product_variants(stock_quantity)')
+                    .eq('platform', 'mercadolibre')
+                    .eq('external_variant_id', String(item.item.variation_id))
+                    .single()
+
+                if (specificVariant) {
+                    await updateLocalStock(supabase, specificVariant.product_variant_id, item.quantity, sale.id, saleNumber)
+                    // Actualizamos la referencia en el sale_item
+                    await supabase.from('sale_items').update({ product_variant_id: specificVariant.product_variant_id }).eq('id', saleItem.id)
+                    continue
+                }
+            }
+
+            // Si no tiene variación o no encontramos match exacto, probamos con el item principal
+            const { data: genericListing } = await query.maybeSingle()
+
+            if (genericListing) {
+                await updateLocalStock(supabase, genericListing.product_variant_id, item.quantity, sale.id, saleNumber)
+                await supabase.from('sale_items').update({ product_variant_id: genericListing.product_variant_id }).eq('id', saleItem.id)
+            } else {
+                console.warn(`No local product found for ML Item ${item.item.id} (Variation: ${item.item.variation_id})`)
+            }
         }
 
         console.log(`✅ Order ${orderId} imported successfully as sale ${saleNumber}`)
@@ -169,6 +213,50 @@ export async function POST(request: NextRequest) {
             error: 'Error processing notification',
             details: err instanceof Error ? err.message : 'Unknown error'
         }, { status: 500 })
+    }
+}
+
+
+// Helper para descontar stock y registrar movimiento
+async function updateLocalStock(
+    supabase: any,
+    variantId: string,
+    quantity: number,
+    saleId: string,
+    saleNumber: string
+) {
+    if (!variantId) return
+
+    try {
+        // 1. Obtener stock actual
+        const { data: variant } = await supabase
+            .from('product_variants')
+            .select('stock_quantity')
+            .eq('id', variantId)
+            .single()
+
+        if (!variant) return
+
+        // 2. Restar stock
+        await supabase
+            .from('product_variants')
+            .update({ stock_quantity: variant.stock_quantity - quantity })
+            .eq('id', variantId)
+
+        // 3. Registrar movimiento
+        await supabase
+            .from('stock_movements')
+            .insert({
+                product_variant_id: variantId,
+                movement_type: 'OUT',
+                quantity: -quantity,
+                reference_type: 'sale',
+                reference_id: saleId,
+                notes: `Venta ML #${saleNumber}`
+            })
+
+    } catch (e) {
+        console.error('Error updating local stock:', e)
     }
 }
 

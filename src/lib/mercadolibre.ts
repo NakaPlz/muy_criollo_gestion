@@ -91,7 +91,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<MLTokenR
 // HELPERS
 // ============================================
 
-async function mlFetch<T>(endpoint: string, accessToken: string, options?: RequestInit): Promise<T> {
+export async function mlFetch<T>(endpoint: string, accessToken: string, options?: RequestInit): Promise<T> {
     const response = await fetch(`${ML_API_URL}${endpoint}`, {
         ...options,
         headers: {

@@ -86,19 +86,25 @@ export default function ConfiguracionPage() {
         }
     }
 
-    async function syncAllStock() {
+    async function syncAllStock(direction: 'push' | 'pull' = 'push') {
         try {
             setSyncing(true);
-            const res = await fetch('/api/mercadolibre/stock', { method: 'PUT' });
+            const res = await fetch('/api/mercadolibre/stock', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ direction })
+            });
             const json = await res.json();
 
             if (json.success) {
-                alert(`✅ Sincronizados ${json.synced} items`);
+                const action = direction === 'push' ? 'Enviado a ML' : 'Recibido de ML';
+                alert(`✅ Sincronización (${action}) completada: ${json.synced} items actualizados`);
                 loadData();
             } else {
                 alert(`❌ Error: ${json.error}`);
             }
         } catch (err) {
+            console.error(err);
             alert('Error sincronizando stock');
         } finally {
             setSyncing(false);
@@ -269,10 +275,23 @@ export default function ConfiguracionPage() {
                         </div>
                     </div>
 
-                    {/* Sync All Button */}
-                    <div className="flex justify-end">
+                    {/* Sync Buttons */}
+                    <div className="flex justify-end gap-3">
                         <button
-                            onClick={syncAllStock}
+                            onClick={() => syncAllStock('pull')}
+                            disabled={syncing || data.linked_items.length === 0}
+                            className="btn btn-outline border-yellow-500 text-yellow-500 hover:bg-yellow-500 hover:text-black"
+                        >
+                            {syncing ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : (
+                                <Download className="h-4 w-4 mr-2" />
+                            )}
+                            Importar Stock (Desde ML)
+                        </button>
+
+                        <button
+                            onClick={() => syncAllStock('push')}
                             disabled={syncing || data.linked_items.length === 0}
                             className="btn btn-primary"
                         >
@@ -281,7 +300,7 @@ export default function ConfiguracionPage() {
                             ) : (
                                 <RefreshCw className="h-4 w-4 mr-2" />
                             )}
-                            Sincronizar Todo el Stock
+                            Enviar Stock (Hacia ML)
                         </button>
                     </div>
 

@@ -325,3 +325,4 @@ INSERT INTO settings (key, value, category) VALUES
 -- ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 -- ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
 -- (Descomentar cuando se implemente autenticación)
+

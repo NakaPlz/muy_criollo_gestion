@@ -1,6 +1,6 @@
 // API Route para sincronizar stock con Mercado Libre
 import { NextRequest, NextResponse } from 'next/server'
-import { getItems, getItem, getItemsMulti, updateItemStock, refreshAccessToken, MLItem } from '@/src/lib/mercadolibre'
+import { getItems, getItem, getItemsMulti, updateItemStock, refreshAccessToken, MLItem, mlFetch } from '@/src/lib/mercadolibre'
 import { createClient } from '@/lib/supabase/server'
 
 interface MLTokens {
@@ -212,9 +212,12 @@ export async function POST(request: NextRequest) {
     }
 }
 
-// PUT: Sincronizar todos los items vinculados
-export async function PUT() {
+// PUT: Sincronizar stock (Push: Local -> ML, Pull: ML -> Local)
+export async function PUT(request: NextRequest) {
     try {
+        const body = await request.json()
+        const direction = body.direction || 'push' // 'push' or 'pull'
+
         const supabase = await createClient()
         const tokens = await getValidTokens(supabase)
 
@@ -232,7 +235,8 @@ export async function PUT() {
                 *,
                 product_variant:product_variants(
                     id,
-                    stock_quantity
+                    stock_quantity,
+                    sku
                 )
             `)
             .eq('platform', 'mercadolibre')
@@ -247,33 +251,119 @@ export async function PUT() {
         let synced = 0
         let errors: string[] = []
 
-        for (const listing of listings || []) {
-            try {
-                if (!listing.product_variant || !listing.external_id) continue
+        if (direction === 'push') {
+            // PUSH: Local -> Mercado Libre
+            for (const listing of listings || []) {
+                try {
+                    if (!listing.product_variant || !listing.external_id) continue
 
-                const newStock = listing.product_variant.stock_quantity
+                    const localStock = listing.product_variant.stock_quantity
 
-                // Solo sincronizar si el stock cambió
-                if (newStock !== listing.stock_synced) {
-                    await updateItemStock(
-                        tokens.access_token,
-                        listing.external_id,
-                        newStock
-                    )
+                    // Solo sincronizar si el stock cambió
+                    if (localStock !== listing.stock_synced) {
+                        if (listing.external_variant_id) {
+                            // Actualizar variación específica
+                            // Nota: ML requiere actualizar el item completo enviando las variaciones
+                            // Esto es complejo por la API de ML, simplificamos asumiendo que el usuario gestiona stock
+                            // Para variaciones, lo ideal es usar el endpoint de /items/{id}/variations/{id} si existe,
+                            // o actualizar el item completo. Por ahora, si tiene variaciones, saltamos la actualización directa
+                            // a menos que implementemos la lógica completa de item update.
+                            // SIN EMBARGO, para stock, podemos usar /items/{id}/variations/{variation_id} ?
+                            // ML API Docs dicen PUT /items/{id}/variations/{variation_id} body: { available_quantity: 10 }
 
-                    // Actualizar registro
-                    await supabase
-                        .from('platform_listings')
-                        .update({
-                            stock_synced: newStock,
-                            last_sync_at: new Date().toISOString(),
-                        })
-                        .eq('id', listing.id)
+                            await mlFetch(
+                                `/items/${listing.external_id}/variations/${listing.external_variant_id}`,
+                                tokens.access_token,
+                                {
+                                    method: 'PUT',
+                                    body: JSON.stringify({ available_quantity: localStock })
+                                }
+                            )
+                        } else {
+                            // Item simple
+                            await updateItemStock(
+                                tokens.access_token,
+                                listing.external_id,
+                                localStock
+                            )
+                        }
 
-                    synced++
+                        // Actualizar registro
+                        await supabase
+                            .from('platform_listings')
+                            .update({
+                                stock_synced: localStock,
+                                last_sync_at: new Date().toISOString(),
+                            })
+                            .eq('id', listing.id)
+
+                        synced++
+                    }
+                } catch (err) {
+                    errors.push(`Item ${listing.external_id}: ${err instanceof Error ? err.message : 'Error'}`)
                 }
-            } catch (err) {
-                errors.push(`Item ${listing.external_id}: ${err instanceof Error ? err.message : 'Error'}`)
+            }
+        } else {
+            // PULL: Mercado Libre -> Local
+            // 1. Obtener status actual de ML para todos los items vinculados
+            const uniqueItemIds = Array.from(new Set(listings?.map(l => l.external_id) || []))
+            const mlItems = await getItemsMulti(tokens.access_token, uniqueItemIds as string[])
+
+            // Mapa para búsqueda rápida
+            const mlItemMap = new Map(mlItems.map(i => [i.id, i]))
+
+            for (const listing of listings || []) {
+                try {
+                    if (!listing.product_variant || !listing.external_id) continue
+
+                    const mlItem = mlItemMap.get(listing.external_id)
+                    if (!mlItem) continue
+
+                    let mlStock = 0
+
+                    if (listing.external_variant_id) {
+                        const variation = mlItem.variations?.find(v => String(v.id) === listing.external_variant_id)
+                        if (variation) {
+                            mlStock = variation.available_quantity
+                        }
+                    } else {
+                        mlStock = mlItem.available_quantity
+                    }
+
+                    // Si el stock es diferente, actualizar local
+                    if (mlStock !== listing.product_variant.stock_quantity) {
+                        // Actualizar stock local
+                        await supabase
+                            .from('product_variants')
+                            .update({ stock_quantity: mlStock })
+                            .eq('id', listing.product_variant.id)
+
+                        // Crear movimiento de stock (ajuste por sync)
+                        await supabase
+                            .from('stock_movements')
+                            .insert({
+                                product_variant_id: listing.product_variant.id,
+                                movement_type: mlStock > listing.product_variant.stock_quantity ? 'IN' : 'OUT',
+                                quantity: Math.abs(mlStock - listing.product_variant.stock_quantity),
+                                reference_type: 'sync',
+                                notes: 'Sincronización manual desde Mercado Libre'
+                            })
+
+                        // Actualizar listing
+                        await supabase
+                            .from('platform_listings')
+                            .update({
+                                stock_synced: mlStock,
+                                last_sync_at: new Date().toISOString(),
+                            })
+                            .eq('id', listing.id)
+
+                        synced++
+                    }
+
+                } catch (err) {
+                    errors.push(`Item ${listing.external_id}: ${err instanceof Error ? err.message : 'Error'}`)
+                }
             }
         }
 
@@ -281,6 +371,7 @@ export async function PUT() {
             success: true,
             synced,
             total: listings?.length || 0,
+            direction,
             errors: errors.length > 0 ? errors : undefined,
         })
     } catch (err) {
@@ -291,3 +382,5 @@ export async function PUT() {
         )
     }
 }
+
+
