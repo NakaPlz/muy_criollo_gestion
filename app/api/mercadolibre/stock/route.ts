@@ -320,14 +320,57 @@ export async function PUT(request: NextRequest) {
                     if (!mlItem) continue
 
                     let mlStock = 0
+                    let matchedVariationId: string | null = null
 
                     if (listing.external_variant_id) {
+                        // Caso ideal: Ya tenemos el ID de variación vinculado
                         const variation = mlItem.variations?.find(v => String(v.id) === listing.external_variant_id)
                         if (variation) {
                             mlStock = variation.available_quantity
+                        } else if (!mlItem.variations || mlItem.variations.length === 0) {
+                            // Fallback: Si ML dice que no hay variaciones pero nosotros teníamos ID (caso raro, quizas cambió la publicacion)
+                            mlStock = mlItem.available_quantity
+                        } else {
+                            // Variation ID no encontrado en ML (quizás eliminada?)
+                            continue
                         }
                     } else {
-                        mlStock = mlItem.available_quantity
+                        // Caso problemático: No tenemos external_variant_id
+                        if (mlItem.variations && mlItem.variations.length > 0) {
+                            // ML tiene variaciones, pero nosotros no sabemos cuál es cuál.
+                            // INTENTO DE RECUPERACIÓN (Self-healing)
+
+                            const localSku = listing.product_variant.sku
+                            let matchedVariation = null
+
+                            if (localSku) {
+                                // Estrategia 1: Buscar si el SKU de ML coincide con el nuestro
+                                matchedVariation = mlItem.variations.find(v => v.seller_custom_field === localSku)
+
+                                // Estrategia 2: Buscar si nuestro SKU contiene el ID de variación (patrón usado en importación: SKU-VAR_ID)
+                                if (!matchedVariation) {
+                                    matchedVariation = mlItem.variations.find(v => localSku.includes(String(v.id)))
+                                }
+                            }
+
+                            if (matchedVariation) {
+                                // Match encontrado! Actualizamos la vinculación para el futuro
+                                await supabase
+                                    .from('platform_listings')
+                                    .update({ external_variant_id: String(matchedVariation.id) })
+                                    .eq('id', listing.id)
+
+                                mlStock = matchedVariation.available_quantity
+                            } else {
+                                // CRÍTICO: Si no podemos matchear, NO actualizamos stock
+                                // Evitamos el bug de asignar el stock total a una variante
+                                errors.push(`Saltado ${listing.external_id}: Requiere vinculación manual de variante`)
+                                continue
+                            }
+                        } else {
+                            // Item simple sin variaciones en ML
+                            mlStock = mlItem.available_quantity
+                        }
                     }
 
                     // Si el stock es diferente, actualizar local
