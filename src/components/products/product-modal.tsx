@@ -388,14 +388,30 @@ export function ProductModal({ product, categories, onClose }: ProductModalProps
                                                         />
                                                     </div>
                                                     <div>
-                                                        <label className="block text-xs font-medium mb-1">Stock mínimo</label>
-                                                        <input
-                                                            type="number"
-                                                            value={variant.min_stock_alert}
-                                                            onChange={(e) => updateVariantField(index, "min_stock_alert", parseInt(e.target.value) || 0)}
-                                                            className="input text-sm"
-                                                            min="0"
-                                                        />
+                                                        <div className="flex items-center justify-between mb-1">
+                                                            <label className="block text-xs font-medium">Alerta Stock</label>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={variant.min_stock_alert >= 0}
+                                                                onChange={(e) => updateVariantField(index, "min_stock_alert", e.target.checked ? 5 : -1)}
+                                                                title="Activar/Desactivar alerta"
+                                                                className="h-3 w-3 rounded border-gray-300"
+                                                            />
+                                                        </div>
+                                                        {variant.min_stock_alert >= 0 ? (
+                                                            <input
+                                                                type="number"
+                                                                value={variant.min_stock_alert}
+                                                                onChange={(e) => updateVariantField(index, "min_stock_alert", parseInt(e.target.value) || 0)}
+                                                                className="input text-sm"
+                                                                min="0"
+                                                                placeholder="Mínimo"
+                                                            />
+                                                        ) : (
+                                                            <div className="input text-sm bg-gray-100 dark:bg-gray-800 text-muted-foreground flex items-center justify-center">
+                                                                <span className="text-xs">Desactivada</span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>

@@ -533,10 +533,18 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     const pendingOrders = sales.filter(s => s.status === 'pending' || s.status === 'processing').length
 
     // Stock bajo (variantes con stock <= min_stock_alert)
-    const { count: lowStockCount, error: stockError } = await getSupabase()
+    // Stock bajo (variantes con stock <= min_stock_alert)
+    // Traemos todas las variantes (ligero, solo columnas necesarias) y filtramos en memoria
+    // porque Supabase no permite comparar dos columnas (stock <= limit) directamente en el filtro simple
+    const { data: variantsData, error: stockError } = await getSupabase()
         .from('product_variants')
-        .select('*', { count: 'exact', head: true })
-        .lte('stock_quantity', 5) // minimo por defecto 5
+        .select('stock_quantity, min_stock_alert')
+
+    if (stockError) throw stockError
+
+    const lowStockCount = (variantsData || []).filter(v =>
+        (v.stock_quantity ?? 0) <= (v.min_stock_alert ?? 5)
+    ).length
 
     if (stockError) throw stockError
 
