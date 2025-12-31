@@ -329,24 +329,40 @@ export async function searchCustomers(query: string): Promise<Customer[]> {
 // VENTAS
 // ============================================
 export async function getSales(): Promise<SaleWithRelations[]> {
-    const { data, error } = await getSupabase()
-        .from('sales')
-        .select(`
-            *,
-            customer:customers(*),
-            items:sale_items(
-                *,
-                product_variant:product_variants(
-                    *,
-                    product:products(name)
-                )
-            )
-        `)
-        .order('created_at', { ascending: false })
-        .limit(5000)
+    let allSales: SaleWithRelations[] = []
+    let page = 0
+    const pageSize = 1000
+    // Límite de seguridad: 10 páginas (10.000 ventas)
+    const maxPages = 10
 
-    if (error) throw error
-    return data || []
+    while (page < maxPages) {
+        const { data, error } = await getSupabase()
+            .from('sales')
+            .select(`
+                *,
+                customer:customers(*),
+                items:sale_items(
+                    *,
+                    product_variant:product_variants(
+                        *,
+                        product:products(name)
+                    )
+                )
+            `)
+            .order('created_at', { ascending: false })
+            .range(page * pageSize, (page + 1) * pageSize - 1)
+
+        if (error) throw error
+
+        if (!data || data.length === 0) break
+
+        allSales = [...allSales, ...data]
+
+        if (data.length < pageSize) break
+        page++
+    }
+
+    return allSales
 }
 
 export async function getSaleById(id: string): Promise<SaleWithRelations | null> {
