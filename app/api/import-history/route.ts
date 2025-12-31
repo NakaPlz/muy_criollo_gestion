@@ -35,8 +35,8 @@ export async function POST() {
         const records = parse(fileContent, {
             columns: true,
             skip_empty_lines: true,
-            from_line: 2 // Saltamos encabezados extraños si los hay (el usuario dijo celda 500 para info relevante, pero procesaremos todo para filtrar)
-        })
+            from_line: 2
+        }) as any[]
 
         // 2. Obtener variantes para matchmaking
         const { data: variants } = await supabase
