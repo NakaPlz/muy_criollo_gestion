@@ -83,7 +83,12 @@ export async function POST() {
             const fechaStr = row['Fecha'] // "17-abr"
             if (!fechaStr || fechaStr === '-') continue
 
-            const [dayStr, monthStr] = fechaStr.split('-')
+            const parts = fechaStr.split('-')
+            if (parts.length < 2) continue
+
+            const dayStr = parts[0]
+            const monthStr = parts[1]
+
             const day = parseInt(dayStr)
             const month = monthMap[monthStr.toLowerCase()]
 
