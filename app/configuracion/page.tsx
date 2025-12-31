@@ -134,6 +134,27 @@ export default function ConfiguracionPage() {
         }
     }
 
+    async function importHistory() {
+        if (!confirm("⚠️ Esto importará todas las ventas del CSV histórico. ¿Continuar?")) return;
+
+        try {
+            setSyncing(true);
+            const res = await fetch('/api/import-history', { method: 'POST' });
+            const json = await res.json();
+
+            if (json.success) {
+                alert(`✅ Importación completada:\n- Procesados: ${json.processed}\n- Importados: ${json.imported}\n- Errores: ${json.errors}`);
+            } else {
+                alert(`❌ Error: ${json.error}`);
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Error importando historial');
+        } finally {
+            setSyncing(false);
+        }
+    }
+
     function isItemLinked(mlItemId: string): boolean {
         return data?.linked_items.some(item => item.external_id === mlItemId) || false;
     }
@@ -277,6 +298,19 @@ export default function ConfiguracionPage() {
 
                     {/* Sync Buttons */}
                     <div className="flex justify-end gap-3">
+                        <button
+                            onClick={importHistory}
+                            disabled={syncing}
+                            className="btn btn-outline"
+                        >
+                            {syncing ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : (
+                                <Download className="h-4 w-4 mr-2" />
+                            )}
+                            Importar Historial CSV
+                        </button>
+
                         <button
                             onClick={() => syncAllStock('pull')}
                             disabled={syncing || data.linked_items.length === 0}
