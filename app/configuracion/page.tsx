@@ -143,7 +143,7 @@ export default function ConfiguracionPage() {
             const json = await res.json();
 
             if (json.success) {
-                alert(`✅ Importación completada:\n- Procesados: ${json.processed}\n- Importados: ${json.imported}\n- Errores: ${json.errors}`);
+                alert(`✅ Importación completada:\n- Procesados: ${json.processed}\n- Importados: ${json.imported}\n- Errores: ${json.errors}\n\nDebug (columnas detectadas): ${JSON.stringify(json.debug_sample)}`);
             } else {
                 alert(`❌ Error: ${json.error}`);
             }

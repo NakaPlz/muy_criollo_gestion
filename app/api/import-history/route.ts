@@ -35,7 +35,8 @@ export async function POST() {
         const records = parse(fileContent, {
             columns: true,
             skip_empty_lines: true,
-            from_line: 2
+            from_line: 2,
+            bom: true
         }) as any[]
 
         // 2. Obtener variantes para matchmaking
@@ -217,7 +218,8 @@ export async function POST() {
             success: true,
             processed: processedCount,
             imported: successCount,
-            errors: errorCount
+            errors: errorCount,
+            debug_sample: records.length > 0 ? Object.keys(records[0]) : 'No records'
         })
 
     } catch (error) {
