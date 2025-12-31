@@ -229,7 +229,7 @@ export async function POST() {
 
 function mapChannel(origin: string): string {
     const o = origin?.toLowerCase() || ''
-    if (o.includes('ml') || o.includes('mercadolibre')) return 'Mercado Libre'
+    if (o.includes('ml') || o.includes('mercadolibre')) return 'ML'
     if (o.includes('local')) return 'Presencial'
     if (o.includes('ig') || o.includes('instagram')) return 'Instagram'
     if (o.includes('johnny')) return 'Presencial' // Asumimos vendedor presencial

@@ -240,9 +240,17 @@ export default function VentasPage() {
                                             {sale.customer?.name || 'Sin cliente'}
                                         </td>
                                         <td className="px-6 py-4">
-                                            <span className={`inline-flex px-2 py-1 text-xs rounded-full ${channelLabels[sale.channel].color}`}>
-                                                {channelLabels[sale.channel].label}
-                                            </span>
+                                            {(() => {
+                                                const channelInfo = channelLabels[sale.channel] || {
+                                                    label: sale.channel,
+                                                    color: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400'
+                                                };
+                                                return (
+                                                    <span className={`inline-flex px-2 py-1 text-xs rounded-full ${channelInfo.color}`}>
+                                                        {channelInfo.label}
+                                                    </span>
+                                                );
+                                            })()}
                                         </td>
                                         <td className="px-6 py-4 text-sm">
                                             {sale.items?.length || 0} item{sale.items?.length !== 1 ? 's' : ''}
