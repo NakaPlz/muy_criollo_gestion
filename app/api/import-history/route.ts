@@ -35,7 +35,6 @@ export async function POST() {
         const records = parse(fileContent, {
             columns: true,
             skip_empty_lines: true,
-            from_line: 2,
             bom: true
         }) as any[]
 
