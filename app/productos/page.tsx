@@ -95,6 +95,32 @@ export default function ProductosPage() {
         return product.variants?.some(v => v.stock_quantity <= v.min_stock_alert) || false;
     }
 
+    const [exporting, setExporting] = useState(false);
+
+    async function handleExport() {
+        try {
+            if (!confirm("Se descargará el catálogo completo en CSV. ¿Continuar?")) return;
+            setExporting(true);
+            const res = await fetch('/api/products/export');
+            if (!res.ok) throw new Error("Error en exportación");
+
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `productos_mc_${new Date().toLocaleDateString('es-AR').replace(/\//g, '-')}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (err) {
+            console.error(err);
+            alert("Error al exportar productos");
+        } finally {
+            setExporting(false);
+        }
+    }
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-96">
@@ -119,13 +145,27 @@ export default function ProductosPage() {
                     <h1 className="text-2xl font-bold">Productos</h1>
                     <p className="text-muted-foreground">Gestiona tu catálogo de productos</p>
                 </div>
-                <button
-                    onClick={handleCreate}
-                    className="btn btn-primary flex items-center gap-2"
-                >
-                    <Plus className="h-4 w-4" />
-                    Nuevo Producto
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        onClick={handleExport}
+                        disabled={exporting}
+                        className="btn btn-outline flex items-center gap-2"
+                    >
+                        {exporting ? (
+                            <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                            <Package className="h-4 w-4" />
+                        )}
+                        {exporting ? "Exportando..." : "Exportar CSV"}
+                    </button>
+                    <button
+                        onClick={handleCreate}
+                        className="btn btn-primary flex items-center gap-2"
+                    >
+                        <Plus className="h-4 w-4" />
+                        Nuevo Producto
+                    </button>
+                </div>
             </div>
 
             {/* Filters */}
@@ -241,8 +281,8 @@ export default function ProductosPage() {
                                     </td>
                                     <td className="px-6 py-4 text-center">
                                         <span className={`inline-flex px-2 py-1 text-xs rounded-full ${product.is_active
-                                                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                                                : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                            : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
                                             }`}>
                                             {product.is_active ? 'Activo' : 'Inactivo'}
                                         </span>
